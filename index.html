@@ -685,16 +685,75 @@
       function startTimerInterval() {
         startPauseBtn.textContent = 'Pause';
         state.timerId = setInterval(() => {
-          state.timeLeft = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
-          updateTimerDisplay();
-
-          if (state.timeLeft === 0) {
-            finishTimer();
-          } else {
-            saveState();
-          }
+          refreshRunningTimer();
         }, 1000);
       }
+
+      function refreshRunningTimer() {
+        if (!state.running || state.endsAt === null) return;
+
+        state.timeLeft = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
+        updateTimerDisplay();
+
+        if (state.timeLeft === 0) {
+          finishTimer();
+        } else {
+          saveState();
+        }
+      }
+
+      function syncStateFromStorage() {
+        stopTimer();
+        restoreState();
+        appEl.dataset.mode = state.currentMode;
+        completedSessionsEl.textContent = String(state.completedSessions);
+        syncMinutesUI();
+        updateModeButtons();
+        updateStatusText();
+        updateTimerDisplay();
+        startPauseBtn.textContent = state.running
+          ? 'Pause'
+          : state.timeLeft < state.durations[state.currentMode] * 60
+            ? 'Resume'
+            : 'Start';
+
+        if (state.running) {
+          startTimerInterval();
+        }
+      }
+
+      window.addEventListener('storage', (event) => {
+        if (event.key !== storageKey || !event.newValue) return;
+
+        let savedState;
+        try {
+          savedState = JSON.parse(event.newValue);
+        } catch (error) {
+          console.warn('Saved Pomodoro state is invalid; ignoring the update from another tab.', error);
+          return;
+        }
+
+        if (
+          state.running &&
+          savedState.running &&
+          state.currentMode === savedState.currentMode &&
+          state.endsAt === savedState.endsAt
+        ) {
+          return;
+        }
+
+        syncStateFromStorage();
+      });
+
+      function refreshWhenVisible() {
+        if (document.visibilityState === 'visible') {
+          refreshRunningTimer();
+        }
+      }
+
+      document.addEventListener('visibilitychange', refreshWhenVisible);
+      window.addEventListener('pageshow', refreshWhenVisible);
+      window.addEventListener('focus', refreshWhenVisible);
 
       function toggleTimer() {
         if (state.running) {
