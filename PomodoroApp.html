@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Pomodoro</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --panel-alt: #f1f5f9;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --primary: #f97316;
+        --secondary: #10b981;
+        --danger: #f43f5e;
+        --accent: var(--primary);
+        --shadow: rgba(15, 23, 42, 0.1);
+        --focus-ring: rgba(249, 115, 22, 0.35);
+      }
+
+      :root[data-theme="dark"],
+      .dark {
+        color-scheme: dark;
+        --bg: #0f172a;
+        --panel: #1e293b;
+        --panel-alt: #263449;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.08);
+        --shadow: rgba(2, 6, 23, 0.35);
+        --focus-ring: rgba(251, 146, 60, 0.4);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body,
+      .app,
+      .block,
+      .mode-toggle,
+      .theme-toggle {
+        transition:
+          background-color 0.25s ease,
+          color 0.25s ease,
+          border-color 0.25s ease,
+          box-shadow 0.25s ease;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: 1.25rem 0.75rem;
+        font-family: Arial, Helvetica, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        width: min(92vw, 32rem);
+        max-width: 100%;
+        padding: clamp(1.25rem, 2vw, 1.8rem) clamp(1rem, 3vw, 1.5rem)
+          clamp(1rem, 2vw, 1.5rem);
+        border-radius: clamp(1rem, 2vw, 1.4rem);
+        background: var(--panel);
+        box-shadow: 0 24px 50px var(--shadow);
+        border: 1px solid var(--border);
+      }
+
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+      }
+
+      .app-logo {
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 0.9rem;
+        background: color-mix(in srgb, var(--accent) 14%, transparent);
+        color: var(--accent);
+      }
+
+      .app-logo svg {
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.35rem, 4vw, 1.8rem);
+        letter-spacing: -0.03em;
+      }
+
+      .theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        min-height: 2.75rem;
+        padding: 0.55rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--panel-alt);
+        color: var(--text);
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .theme-toggle svg {
+        width: 1rem;
+        height: 1rem;
+      }
+
+      .theme-toggle .icon-moon,
+      :root[data-theme="dark"] .theme-toggle .icon-sun,
+      .dark .theme-toggle .icon-sun {
+        display: none;
+      }
+
+      :root[data-theme="dark"] .theme-toggle .icon-moon,
+      .dark .theme-toggle .icon-moon {
+        display: block;
+      }
+
+      .mode-toggle {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.4rem, 1vw, 0.6rem);
+        margin-bottom: 1.5rem;
+        background: var(--panel-alt);
+        padding: clamp(0.5rem, 1.5vw, 0.7rem);
+        border-radius: 0.9rem;
+        border: 1px solid var(--border);
+      }
+
+      .mode-btn {
+        appearance: none;
+        border: none;
+        border-radius: 0.7rem;
+        padding: clamp(0.7rem, 1.5vw, 0.9rem) clamp(0.4rem, 1vw, 0.7rem);
+        font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+        font-weight: 700;
+        color: var(--text);
+        background: transparent;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          color 0.2s ease,
+          background-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .mode-btn.active {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+      }
+
+      .app[data-mode="shortBreak"],
+      .app[data-mode="longBreak"] {
+        --accent: var(--secondary);
+      }
+
+      .timer-wrap {
+        text-align: center;
+        margin-bottom: 18px;
+      }
+
+      .timer {
+        font-size: clamp(3rem, 9vw, 5rem);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        font-variant-numeric: tabular-nums;
+        margin: 0;
+      }
+
+      .status {
+        color: var(--muted);
+        font-size: 0.95rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-top: 0.4rem;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: clamp(0.5rem, 1vw, 0.8rem);
+        margin: 1.1rem 0 1.4rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 1px solid transparent;
+        border-radius: 0.8rem;
+        padding: clamp(0.7rem, 1.5vw, 0.9rem) clamp(0.9rem, 2vw, 1rem);
+        font-size: 0.98rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          opacity 0.2s ease,
+          background-color 0.2s ease,
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(0) scale(0.98);
+      }
+
+      button:focus-visible {
+        outline: 3px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: white;
+      }
+
+      .primary:hover {
+        filter: brightness(1.06);
+      }
+
+      .secondary {
+        background: var(--panel-alt);
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      .danger {
+        background: var(--danger);
+        color: white;
+      }
+
+      .danger:hover {
+        filter: brightness(1.06);
+      }
+
+      .settings {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.6rem, 2vw, 0.9rem);
+        margin-top: 0.5rem;
+      }
+
+      .block {
+        background: var(--panel-alt);
+        border: 1px solid var(--border);
+        border-radius: 0.8rem;
+        padding: clamp(0.7rem, 1.5vw, 0.9rem) clamp(0.5rem, 1vw, 0.7rem);
+        text-align: center;
+      }
+
+      .block label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 0.65rem;
+      }
+
+      .stepper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+      }
+
+      .stepper button {
+        width: clamp(1.8rem, 4vw, 2.1rem);
+        height: clamp(1.8rem, 4vw, 2.1rem);
+        border-radius: 50%;
+        padding: 0;
+        font-size: 1.1rem;
+        background: var(--panel);
+        border-color: var(--border);
+        color: var(--text);
+      }
+
+      .minutes {
+        font-size: clamp(1.2rem, 3vw, 1.5rem);
+        font-weight: 700;
+        min-width: 2.2rem;
+      }
+
+      .session-summary {
+        margin-top: 1.4rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-align: center;
+      }
+
+      .session-count {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .app-footer {
+        width: min(92vw, 32rem);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+        text-align: center;
+      }
+
+      .footer-profile {
+        display: grid;
+        gap: 0.35rem;
+      }
+
+      .footer-profile p,
+      .footer-meta {
+        margin: 0;
+      }
+
+      .footer-credit {
+        color: var(--text);
+      }
+
+      .footer-credit strong {
+        font-weight: 700;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+      }
+
+      .footer-links a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: var(--muted);
+        text-decoration: none;
+        transition: color 0.2s ease, transform 0.15s ease;
+      }
+
+      .footer-links a:hover {
+        color: var(--primary);
+        transform: translateY(-1px);
+      }
+
+      .footer-links a:focus-visible {
+        outline: 3px solid var(--focus-ring);
+        outline-offset: 3px;
+        border-radius: 0.2rem;
+      }
+
+      .footer-links svg {
+        width: 1rem;
+        height: 1rem;
+        fill: currentColor;
+      }
+
+      .footer-meta {
+        font-size: 0.75rem;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 360px) {
+        .app-header {
+          gap: 0.5rem;
+        }
+
+        .brand {
+          gap: 0.5rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app" data-mode="work">
+      <header class="app-header">
+        <div class="brand">
+          <span class="app-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="13" r="8" />
+              <path d="M12 9v4l2.5 1.5M9 2h6M12 2v3" />
+            </svg>
+          </span>
+          <h1>Simple Pomodoro</h1>
+        </div>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark theme" aria-pressed="false">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+          </svg>
+          <span id="themeLabel">Light</span>
+        </button>
+      </header>
+
+      <section aria-label="Pomodoro timer">
+        <div class="mode-toggle" role="group" aria-label="Timer modes">
+          <button class="mode-btn active" type="button" data-mode="work" aria-pressed="true">Work</button>
+          <button class="mode-btn" type="button" data-mode="shortBreak" aria-pressed="false">Break</button>
+          <button class="mode-btn" type="button" data-mode="longBreak" aria-pressed="false">Long</button>
+        </div>
+
+        <div class="timer-wrap">
+          <p id="timer" class="timer">25:00</p>
+          <div id="status" class="status">Focus time</div>
+        </div>
+
+        <div class="controls">
+          <button id="startPauseBtn" class="primary" type="button">Start</button>
+          <button id="resetBtn" class="danger" type="button">Reset</button>
+        </div>
+
+        <div class="settings">
+          <div class="block">
+            <label>Work</label>
+            <div class="stepper">
+              <button type="button" aria-label="Decrease work duration" data-type="work" data-change="-1">−</button>
+              <span id="workMinutes" class="minutes">25</span>
+              <button type="button" aria-label="Increase work duration" data-type="work" data-change="1">+</button>
+            </div>
+          </div>
+
+          <div class="block">
+            <label>Break</label>
+            <div class="stepper">
+              <button type="button" aria-label="Decrease short break duration" data-type="shortBreak" data-change="-1">−</button>
+              <span id="shortBreakMinutes" class="minutes">5</span>
+              <button type="button" aria-label="Increase short break duration" data-type="shortBreak" data-change="1">+</button>
+            </div>
+          </div>
+
+          <div class="block">
+            <label>Long</label>
+            <div class="stepper">
+              <button type="button" aria-label="Decrease long break duration" data-type="longBreak" data-change="-1">−</button>
+              <span id="longBreakMinutes" class="minutes">15</span>
+              <button type="button" aria-label="Increase long break duration" data-type="longBreak" data-change="1">+</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="session-summary">
+        <span>Completed: <span id="completedSessions" class="session-count">0</span></span>
+      </div>
+    </main>
+
+    <footer class="app-footer" aria-label="Developer information">
+      <div class="footer-profile">
+      <div></div>
+        <p class="footer-credit">Designed &amp; Built by <strong>Theo Yoshimura</strong></p>
+        <p>Full-Stack Developer</p>
+      </div>
+      <nav class="footer-links" aria-label="Social links">
+        <a href="https://github.com/Itsuo7" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 .9a11.1 11.1 0 0 0-3.51 21.63c.56.1.76-.24.76-.54v-2.1c-3.1.68-3.76-1.32-3.76-1.32-.5-1.29-1.23-1.63-1.23-1.63-1.01-.69.08-.68.08-.68 1.12.08 1.71 1.15 1.71 1.15.99 1.7 2.6 1.21 3.23.92.1-.72.39-1.21.71-1.49-2.48-.28-5.08-1.24-5.08-5.52 0-1.22.44-2.21 1.15-2.99-.12-.28-.5-1.42.11-2.95 0 0 .94-.3 3.05 1.14a10.6 10.6 0 0 1 5.55 0c2.11-1.44 3.05-1.14 3.05-1.14.61 1.53.23 2.67.11 2.95.72.78 1.15 1.77 1.15 2.99 0 4.29-2.61 5.24-5.1 5.51.4.35.76 1.03.76 2.08v3.08c0 .3.2.65.77.54A11.1 11.1 0 0 0 12 .9Z" />
+          </svg>
+          GitHub
+        </a>
+      </nav>
+      <p class="footer-meta">v1.0 <span aria-hidden="true">•</span> © 2026 Theo Yoshimura</p>
+    </footer>
+
+    <script>
+      const modes = {
+        work: { label: 'Focus time', defaultMinutes: 25 },
+        shortBreak: { label: 'Short break', defaultMinutes: 5 },
+        longBreak: { label: 'Long break', defaultMinutes: 15 }
+      };
+
+      const state = {
+        currentMode: 'work',
+        durations: {
+          work: 25,
+          shortBreak: 5,
+          longBreak: 15
+        },
+        timeLeft: 25 * 60,
+        timerId: null,
+        running: false,
+        endsAt: null,
+        completedSessions: 0
+      };
+
+      const storageKey = 'pomodoroAppState';
+      const themeStorageKey = 'pomodoroAppTheme';
+      const timerEl = document.getElementById('timer');
+      const statusEl = document.getElementById('status');
+      const startPauseBtn = document.getElementById('startPauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const themeToggle = document.getElementById('themeToggle');
+      const themeLabel = document.getElementById('themeLabel');
+      const completedSessionsEl = document.getElementById('completedSessions');
+      const appEl = document.querySelector('.app');
+      const modeButtons = document.querySelectorAll('.mode-btn');
+      const minuteEls = {
+        work: document.getElementById('workMinutes'),
+        shortBreak: document.getElementById('shortBreakMinutes'),
+        longBreak: document.getElementById('longBreakMinutes')
+      };
+
+      function formatTime(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+
+      function updateTimerDisplay() {
+        timerEl.textContent = formatTime(state.timeLeft);
+      }
+
+      function updateModeButtons() {
+        modeButtons.forEach((button) => {
+          const active = button.dataset.mode === state.currentMode;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+
+      function updateStatusText() {
+        statusEl.textContent = modes[state.currentMode].label;
+      }
+
+      function syncMinutesUI() {
+        Object.entries(minuteEls).forEach(([mode, el]) => {
+          el.textContent = String(state.durations[mode]);
+        });
+      }
+
+      function stopTimer() {
+        if (state.timerId) {
+          clearInterval(state.timerId);
+          state.timerId = null;
+        }
+      }
+
+      function saveState() {
+        const savedState = {
+          currentMode: state.currentMode,
+          durations: state.durations,
+          timeLeft: state.timeLeft,
+          running: state.running,
+          endsAt: state.running ? state.endsAt : null,
+          completedSessions: state.completedSessions
+        };
+
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(savedState));
+        } catch (error) {
+          console.error('Unable to save Pomodoro state to this browser.', error);
+        }
+      }
+
+      function restoreState() {
+        let savedValue;
+
+        try {
+          savedValue = localStorage.getItem(storageKey);
+        } catch (error) {
+          console.error('Unable to read Pomodoro state from this browser.', error);
+          return;
+        }
+
+        if (!savedValue) return;
+
+        try {
+          const savedState = JSON.parse(savedValue);
+          const validMode = Object.prototype.hasOwnProperty.call(modes, savedState.currentMode);
+          const validCompletedSessions = savedState.completedSessions === undefined ||
+            (Number.isSafeInteger(savedState.completedSessions) && savedState.completedSessions >= 0);
+          const validDurations = savedState.durations &&
+            ['work', 'shortBreak', 'longBreak'].every((mode) =>
+              Number.isInteger(savedState.durations[mode]) &&
+              savedState.durations[mode] >= 1 &&
+              savedState.durations[mode] <= 60
+            );
+
+          if (
+            !validMode ||
+            !validDurations ||
+            !validCompletedSessions ||
+            !Number.isInteger(savedState.timeLeft) ||
+            savedState.timeLeft < 0 ||
+            savedState.timeLeft > savedState.durations[savedState.currentMode] * 60 ||
+            typeof savedState.running !== 'boolean' ||
+            (savedState.running &&
+              (!Number.isSafeInteger(savedState.endsAt) || savedState.endsAt < 0))
+          ) {
+            throw new Error('Saved Pomodoro state has an invalid format.');
+          }
+
+          state.currentMode = savedState.currentMode;
+          state.durations = savedState.durations;
+          state.timeLeft = savedState.timeLeft;
+          state.running = savedState.running;
+          state.endsAt = state.running ? savedState.endsAt : null;
+          state.completedSessions = savedState.completedSessions || 0;
+
+          if (state.running) {
+            state.timeLeft = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
+            if (state.timeLeft === 0) {
+              state.running = false;
+              state.endsAt = null;
+            }
+          }
+        } catch (error) {
+          console.warn('Saved Pomodoro state is invalid; using default settings.', error);
+        }
+      }
+
+      function setMode(mode) {
+        state.currentMode = mode;
+        state.timeLeft = state.durations[mode] * 60;
+        state.running = false;
+        state.endsAt = null;
+        stopTimer();
+        startPauseBtn.textContent = 'Start';
+        appEl.dataset.mode = mode;
+        updateModeButtons();
+        updateStatusText();
+        updateTimerDisplay();
+        saveState();
+      }
+
+      function finishTimer() {
+        stopTimer();
+        state.running = false;
+        state.endsAt = null;
+        state.completedSessions += 1;
+        completedSessionsEl.textContent = String(state.completedSessions);
+        startPauseBtn.textContent = 'Start';
+        saveState();
+        alert(`${modes[state.currentMode].label} finished!`);
+      }
+
+      function startTimerInterval() {
+        startPauseBtn.textContent = 'Pause';
+        state.timerId = setInterval(() => {
+          state.timeLeft = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
+          updateTimerDisplay();
+
+          if (state.timeLeft === 0) {
+            finishTimer();
+          } else {
+            saveState();
+          }
+        }, 1000);
+      }
+
+      function toggleTimer() {
+        if (state.running) {
+          state.timeLeft = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
+          state.running = false;
+          state.endsAt = null;
+          stopTimer();
+          startPauseBtn.textContent = 'Resume';
+          updateTimerDisplay();
+          saveState();
+          return;
+        }
+
+        state.running = true;
+        state.endsAt = Date.now() + state.timeLeft * 1000;
+        saveState();
+        startTimerInterval();
+      }
+
+      function resetTimer() {
+        stopTimer();
+        state.running = false;
+        state.endsAt = null;
+        state.timeLeft = state.durations[state.currentMode] * 60;
+        startPauseBtn.textContent = 'Start';
+        updateTimerDisplay();
+        saveState();
+      }
+
+      function adjustDuration(type, delta) {
+        const nextValue = Math.min(60, Math.max(1, state.durations[type] + delta));
+        state.durations[type] = nextValue;
+
+        if (state.currentMode === type) {
+          state.timeLeft = nextValue * 60;
+          if (state.running) {
+            state.endsAt = Date.now() + state.timeLeft * 1000;
+          }
+          updateTimerDisplay();
+        }
+
+        syncMinutesUI();
+        saveState();
+      }
+
+      modeButtons.forEach((button) => {
+        button.addEventListener('click', () => setMode(button.dataset.mode));
+      });
+
+      function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        const isDark = theme === 'dark';
+        themeToggle.setAttribute('aria-pressed', String(isDark));
+        themeToggle.setAttribute('aria-label', `Switch to ${isDark ? 'light' : 'dark'} theme`);
+        themeLabel.textContent = isDark ? 'Dark' : 'Light';
+        try {
+          localStorage.setItem(themeStorageKey, theme);
+        } catch (error) {
+          console.error('Unable to save the theme preference to this browser.', error);
+        }
+      }
+
+      themeToggle.addEventListener('click', () => {
+        const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        setTheme(nextTheme);
+      });
+
+      startPauseBtn.addEventListener('click', toggleTimer);
+      resetBtn.addEventListener('click', resetTimer);
+
+      document.querySelectorAll('[data-change]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const { type, change } = button.dataset;
+          adjustDuration(type, Number(change));
+        });
+      });
+
+      restoreState();
+      appEl.dataset.mode = state.currentMode;
+      completedSessionsEl.textContent = String(state.completedSessions);
+      syncMinutesUI();
+      updateModeButtons();
+      updateStatusText();
+      updateTimerDisplay();
+      try {
+        const savedTheme = localStorage.getItem(themeStorageKey);
+        setTheme(savedTheme === 'dark' ? 'dark' : 'light');
+      } catch (error) {
+        console.error('Unable to read the theme preference from this browser.', error);
+        document.documentElement.dataset.theme = 'light';
+      }
+      startPauseBtn.textContent = state.running ? 'Pause' : 'Start';
+      if (state.running) {
+        startTimerInterval();
+      } else {
+        saveState();
+      }
+    </script>
+  </body>
+</html>
