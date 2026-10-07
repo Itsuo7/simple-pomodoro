@@ -306,6 +306,15 @@
         color: var(--text);
       }
 
+      .stepper button:disabled {
+        background: var(--panel-alt);
+        border-color: var(--border);
+        color: var(--muted);
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
+
       .minutes {
         font-size: clamp(1.2rem, 3vw, 1.5rem);
         font-weight: 700;
