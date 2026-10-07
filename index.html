@@ -542,6 +542,7 @@
       const completedSessionsEl = document.getElementById('completedSessions');
       const appEl = document.querySelector('.app');
       const modeButtons = document.querySelectorAll('.mode-btn');
+      const durationButtons = document.querySelectorAll('.stepper button');
       const minuteEls = {
         work: document.getElementById('workMinutes'),
         shortBreak: document.getElementById('shortBreakMinutes'),
@@ -573,6 +574,12 @@
       function syncMinutesUI() {
         Object.entries(minuteEls).forEach(([mode, el]) => {
           el.textContent = String(state.durations[mode]);
+        });
+      }
+
+      function updateDurationControls() {
+        durationButtons.forEach((button) => {
+          button.disabled = state.running;
         });
       }
 
@@ -668,6 +675,7 @@
         updateModeButtons();
         updateStatusText();
         updateTimerDisplay();
+        updateDurationControls();
         saveState();
       }
 
@@ -678,12 +686,14 @@
         state.completedSessions += 1;
         completedSessionsEl.textContent = String(state.completedSessions);
         startPauseBtn.textContent = 'Start';
+        updateDurationControls();
         saveState();
         alert(`${modes[state.currentMode].label} finished!`);
       }
 
       function startTimerInterval() {
         startPauseBtn.textContent = 'Pause';
+        updateDurationControls();
         state.timerId = setInterval(() => {
           refreshRunningTimer();
         }, 1000);
@@ -711,6 +721,7 @@
         updateModeButtons();
         updateStatusText();
         updateTimerDisplay();
+        updateDurationControls();
         startPauseBtn.textContent = state.running
           ? 'Pause'
           : state.timeLeft < state.durations[state.currentMode] * 60
@@ -763,12 +774,14 @@
           stopTimer();
           startPauseBtn.textContent = 'Resume';
           updateTimerDisplay();
+          updateDurationControls();
           saveState();
           return;
         }
 
         state.running = true;
         state.endsAt = Date.now() + state.timeLeft * 1000;
+        updateDurationControls();
         saveState();
         startTimerInterval();
       }
@@ -780,10 +793,13 @@
         state.timeLeft = state.durations[state.currentMode] * 60;
         startPauseBtn.textContent = 'Start';
         updateTimerDisplay();
+        updateDurationControls();
         saveState();
       }
 
       function adjustDuration(type, delta) {
+        if (state.running) return;
+
         const nextValue = Math.min(60, Math.max(1, state.durations[type] + delta));
         state.durations[type] = nextValue;
 
@@ -838,6 +854,7 @@
       updateModeButtons();
       updateStatusText();
       updateTimerDisplay();
+      updateDurationControls();
       try {
         const savedTheme = localStorage.getItem(themeStorageKey);
         setTheme(savedTheme === 'dark' ? 'dark' : 'light');
